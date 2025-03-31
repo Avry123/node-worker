@@ -1,0 +1,1347 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model PickupPincode {
+  id          Int      @id @default(autoincrement())
+  Pincode     String   @unique
+  Serviceable String[]
+
+  @@index([Pincode])
+}
+
+model DeliveryPincode {
+  id          Int      @id @default(autoincrement())
+  Pincode     String   @unique
+  Serviceable String[]
+  Cod         String[]
+  Rev         String[]
+
+  @@index([Pincode])
+}
+
+model Users {
+  id                   Int                    @id @default(autoincrement())
+  email                String                 @unique
+  userid               String                 @unique
+  phone                String
+  fullname             String
+  kyc                  KycStatus              @default(PENDING)
+  specialRatesEnabled  Boolean                @default(false)
+  buddyShield          Boolean                @default(false)
+  negotiation          Negotiation            @default(First_Negotiation)
+  paymentMethod        PaymentMethod          @default(PREPAID)
+  PaymentSheet         paymentSheet?          @default(Weekly)
+  cardLimit            Decimal                @default(0)
+  allocatedKAM         String?
+  Referral_Coupon      String                 @unique
+  createdAt            DateTime               @default(now())
+  isDeactivated        Boolean                @default(false)
+  ShowRto              Boolean                @default(false)
+  ShowDangerous        Boolean                @default(false)
+  Label_logo           String?
+  partnerPreferences   Json?
+  LastRemittance       DateTime?              @default(now())
+  allotedToKamId       String?
+  StoreName            String?
+  earlyCod             Decimal                @default(0)
+  buddyShieldOptIn     DateTime?
+  buddyShieldOptOut    DateTime?
+  locations            Address[]
+  CRM_Tickets          CRM_Tickets[]
+  Card_Limit           Card_Limit[]
+  Channels             Channels[]
+  Credits              Credits[]
+  HighShipping_Tickets HighShipping_Tickets[]
+  kycDetails           KycDetails?
+  logs                 LogEntry[]
+  Notification         Notification[]
+  orders               Orders[]
+  PersonalInformation  PersonalInformation?
+  Remittance           Remittance[]
+  Token                Token?
+  UserCoupon           UserCoupon[]
+  userRates            UserRates[]
+  allotedToKam         CRM_Users?             @relation(fields: [allotedToKamId], references: [id])
+  walletData           Wallet[]
+
+  @@index([email, userid])
+}
+
+model Admin {
+  id                     Int               @id @default(autoincrement())
+  userid                 String            @unique
+  email                  String            @unique
+  fullName               String
+  phone                  String
+  imageUrl               String?
+  lastActiveAt           DateTime?
+  createdAt              DateTime          @default(now())
+  updatedAt              DateTime          @updatedAt
+  isAuthorized           Boolean
+  isActive               Boolean           @default(true)
+  departmentId           Int?
+  roleId                 Int?
+  permissions            String[]
+  additional_permissions String[]
+  department             Admin_Department? @relation(fields: [departmentId], references: [id])
+  role                   Admin_Role?       @relation(fields: [roleId], references: [id])
+  LogEntry               LogEntry[]
+  Notification           Notification[]
+}
+
+model Admin_Department {
+  id    Int           @id @default(autoincrement())
+  name  CRMDepartment @unique
+  users Admin[]
+  roles Admin_Role[]
+}
+
+model Admin_Role {
+  id           Int                @id @default(autoincrement())
+  name         CRMRole
+  departmentId Int?
+  isGlobal     Boolean            @default(false)
+  users        Admin[]
+  department   Admin_Department?  @relation(fields: [departmentId], references: [id])
+  permissions  Admin_Permission[] @relation("Admin_PermissionToCRM_Role")
+
+  @@unique([name, departmentId])
+}
+
+model Admin_Permission {
+  id    Int          @id @default(autoincrement())
+  name  String       @unique
+  roles Admin_Role[] @relation("Admin_PermissionToCRM_Role")
+}
+
+model Address {
+  id                    Int        @id @default(autoincrement())
+  userid                String
+  tag                   String
+  personName            String?
+  contactNumber         String
+  email                 String?
+  alternateNumber       String?
+  address               String
+  landmark              String?
+  pincode               Int
+  createdAt             DateTime   @default(now())
+  city                  String     @db.VarChar(200)
+  state                 String     @db.VarChar(200)
+  country               String     @db.VarChar(200)
+  defaultAddress        Boolean    @default(false)
+  user                  Users      @relation(fields: [userid], references: [userid], onDelete: Cascade)
+  logs                  LogEntry[]
+  pickUpOrders          Orders[]   @relation("PickupAddress")
+  reverseCustomerOrders Orders[]   @relation("ReverseCustomerAddress")
+  rtoOrders             Orders[]   @relation("RtoAddress")
+
+  @@unique([userid, tag])
+  @@index([pincode, city, state])
+}
+
+model Orders {
+  id                     Int                   @id @default(autoincrement())
+  orderId                Int                   @unique
+  orderRate              Int?                  @default(0)
+  CODcharges             Int?
+  usersId                String
+  status                 OrderStatus
+  shippingDate           DateTime
+  invoiceDate            DateTime?
+  pickupTime             DateTime?
+  paymentMode            String?
+  shippingMode           String?
+  buddyshieldBoolean     Boolean?              @default(false)
+  deadWeight             Decimal?
+  length                 Decimal?
+  breadth                Decimal?
+  height                 Decimal?
+  totalOrderValue        Decimal?
+  applicableWeight       Decimal?
+  isDangerous            Boolean               @default(false)
+  deliveryType           deliveryType
+  createdAt              DateTime              @default(now())
+  awbNumber              String?               @unique
+  deliveryPartner        String?
+  agentAddressId         Int?
+  rtoAgentAddressId      Int?
+  reverseAgentAddressId  Int?
+  forwardCustomerId      Int?
+  reverseCustomerId      Int?
+  responseOrderId        String?               @unique
+  ChannelOrder_Id        String?
+  Channels               String?
+  ShopDomain             String?
+  Channel_OrderNo        Int?
+  BS_Refund              Boolean?              @default(false)
+  highshipping_decision  HighShippingDecision?
+  remittanceId           Int?
+  Zone                   String?
+  RtoAwb                 String?
+  payedBy                String?
+  Combo_Amount           String?
+  vasMetadata            Json?                 @db.Json
+  shipmentCreationDate   DateTime?
+  AtsLabel               String?
+  SS_Delivery_Code       String?
+  edd                    DateTime?
+  eddUpdatedTime         DateTime?
+  BuddyShield            BuddyShield?
+  Card_Limit             Card_Limit[]
+  Credits                Credits[]
+  HighShipping           HighShipping?
+  logs                   LogEntry[]
+  Store                  Channels?             @relation(fields: [ShopDomain], references: [ShopDomain])
+  PickUpAddress          Address?              @relation("PickupAddress", fields: [agentAddressId], references: [id])
+  DeliveryPartner        DeliveryPartner?      @relation(fields: [deliveryPartner], references: [partnerName])
+  customerAddress        CustomerAddress?      @relation("ForwardCustomerAddress", fields: [forwardCustomerId], references: [customerId])
+  Remittance             Remittance?           @relation(fields: [remittanceId], references: [id])
+  ReversePickupAddress   CustomerAddress?      @relation("ReversePickupAddress", fields: [reverseAgentAddressId], references: [customerId])
+  reverseCustomerAddress Address?              @relation("ReverseCustomerAddress", fields: [reverseCustomerId], references: [id])
+  RtoAddress             Address?              @relation("RtoAddress", fields: [rtoAgentAddressId], references: [id])
+  Users                  Users                 @relation(fields: [usersId], references: [userid])
+  Packages               Packages[]
+  TrackingCard           TrackingCard?
+  Wallet                 Wallet[]
+
+  @@index([usersId, status, shippingDate])
+  @@index([awbNumber])
+  @@index([agentAddressId, rtoAgentAddressId, reverseAgentAddressId])
+}
+
+model TrackingCard {
+  id                 Int         @id @default(autoincrement())
+  awbNumber          String      @unique
+  orderId            String
+  partner            String
+  currentStatus      String
+  deliveredTimestamp DateTime?
+  rtoTimestamp       DateTime?
+  currentLocation    String?
+  scannedWeight      String?
+  trackingEvents     Json
+  remittanceId       Int?
+  lastUpdated        String?
+  order              Orders      @relation(fields: [awbNumber], references: [awbNumber])
+  Remittance         Remittance? @relation(fields: [remittanceId], references: [id])
+
+  @@index([awbNumber])
+}
+
+model Tracking {
+  id         Int      @id @default(autoincrement())
+  partner    String
+  rawData    String
+  receivedAt DateTime @default(now())
+}
+
+model HighShipping {
+  id                    Int      @id @default(autoincrement())
+  awb                   String   @unique
+  high_shipping_date    DateTime
+  order_status_remarks  HSStatus @default(AWAITING_PROOF)
+  old_orderRate         Float    @default(0)
+  old_applicable_weight Float
+  high_shipping_weight  Int
+  refund                Float    @default(0)
+  upload_proof          Boolean  @default(false)
+  tracking_link         String?
+  no_of_files_uploaded  Int      @default(0)
+  order                 Orders   @relation(fields: [awb], references: [awbNumber])
+
+  @@index([awb])
+}
+
+model BuddyShield {
+  id                     Int                 @id @default(autoincrement())
+  awbNumber              String              @unique
+  rtoStarted             DateTime?
+  trackingLink           String?
+  remarks                Json?
+  buddyShieldStatus      BuddyShieldUser     @default(NOT_STARTED)
+  buddyShieldUploadProof Boolean             @default(false)
+  refund                 Boolean             @default(false)
+  status                 NDRStatus           @default(OPEN)
+  order                  Orders              @relation(fields: [awbNumber], references: [awbNumber])
+  retattemptCounter      retattemptCounter[]
+
+  @@index([awbNumber])
+}
+
+model retattemptCounter {
+  id          Int         @id @default(autoincrement())
+  awbNumber   String
+  timeStamp   DateTime
+  count       Int
+  BuddyShield BuddyShield @relation(fields: [awbNumber], references: [awbNumber])
+
+  @@index([awbNumber])
+}
+
+model CustomerAddress {
+  customerId       Int        @id @default(autoincrement())
+  orderId          Int
+  fullName         String
+  contactNumber    String
+  email            String
+  alternateNumber  String?
+  buyerCompanyName String?
+  buyerGstin       String?
+  address          String
+  landmark         String?
+  pincode          Int
+  createdAt        DateTime   @default(now())
+  city             String     @db.VarChar(200)
+  state            String     @db.VarChar(200)
+  country          String     @db.VarChar(200)
+  logs             LogEntry[]
+  forwardOrder     Orders[]   @relation("ForwardCustomerAddress")
+  reverseOrder     Orders[]   @relation("ReversePickupAddress")
+
+  @@index([orderId])
+  @@index([pincode, city, state])
+}
+
+model Packages {
+  PackageId   Int        @id @default(autoincrement())
+  orderId     Int
+  productName String
+  quantity    Int
+  price       String
+  hsn         String?
+  sku         String?
+  image       String?
+  category    Categories @default(Others)
+  color       String?
+  brand       String?
+  size        String?
+  createdAt   DateTime   @default(now())
+  logs        LogEntry[]
+  orders      Orders     @relation(fields: [orderId], references: [id])
+
+  @@index([orderId, category])
+}
+
+model DeliveryPartner {
+  partnerId                  Int           @id @default(autoincrement())
+  partnerName                String        @unique
+  rating                     Decimal
+  partnerImage               String?
+  IsProvidesReverseOrder     Boolean       @default(false)
+  isProvideDangerousShipping Boolean?      @default(false)
+  shippingMode               ShippingMode  @default(SURFACE)
+  isActive                   Boolean       @default(true)
+  allotedToLogisticId        String?
+  CRM_Tickets                CRM_Tickets[]
+  allotedToLogistic          CRM_Users?    @relation(fields: [allotedToLogisticId], references: [id])
+  logs                       LogEntry[]
+  Orders                     Orders[]
+  RateMaster                 RateMaster[]
+  UserRates                  UserRates[]
+
+  @@index([partnerName, rating])
+}
+
+model RateMaster {
+  RateMasterId    Int             @id @default(autoincrement())
+  partnerName     String
+  WeightSlabs     Int
+  WithinCity      Decimal
+  WithinZone      Decimal
+  MetrotoMetro    Decimal
+  RestofIndia     Decimal
+  SpecialZone     Decimal
+  CODCharges      Decimal
+  CODPercentage   Decimal
+  MinimumWeight   Int
+  IsDefault       Boolean         @default(true)
+  logs            LogEntry[]
+  DeliveryPartner DeliveryPartner @relation(fields: [partnerName], references: [partnerName], onDelete: Cascade)
+
+  @@index([partnerName, WeightSlabs])
+}
+
+model UserRates {
+  UserRateId      Int             @id @default(autoincrement())
+  partnerName     String
+  WeightSlabs     Int
+  WithinCity      Decimal
+  WithinZone      Decimal
+  MetrotoMetro    Decimal
+  RestofIndia     Decimal
+  SpecialZone     Decimal
+  CODCharges      Decimal
+  CODPercentage   Decimal
+  MinimumWeight   Int
+  CheckBoxValue   Boolean         @default(false)
+  UserId          Int
+  IsDefault       Boolean         @default(false)
+  logs            LogEntry[]
+  Users           Users           @relation(fields: [UserId], references: [id], onDelete: Cascade)
+  DeliveryPartner DeliveryPartner @relation(fields: [partnerName], references: [partnerName], onDelete: Cascade)
+
+  @@index([partnerName, UserId, WeightSlabs])
+}
+
+model Wallet {
+  id              Int             @id @default(autoincrement())
+  userId          String
+  UUID            String?         @unique
+  TransactionId   String
+  customerName    String
+  status          String?
+  transactionDate DateTime
+  debitedAmount   Decimal
+  creditedAmount  Decimal
+  balance         Decimal
+  ModeOfPayment   String
+  description     String
+  tags            TransactionTags
+  orderId         Int?
+  awbNumber       String?
+  CreditedBy      String?
+  Coupon          String?         @default("-")
+  LogEntry        LogEntry[]
+  Orders          Orders?         @relation(fields: [awbNumber], references: [awbNumber])
+  userWallet      Users           @relation(fields: [userId], references: [userid])
+}
+
+model KycDetails {
+  id                   Int           @id @default(autoincrement())
+  userId               String        @unique
+  businessType         BusinessType?
+  companyType          String?
+  aadhaarNumber        String?
+  panId                String?
+  gstNumber            String?
+  gumastaLicenseImage  String?
+  gstCertificateImage  String?
+  msmeCertificateImage String?
+  aadhaarVerified      Boolean       @default(false)
+  panVerified          Boolean       @default(false)
+  gstVerified          Boolean       @default(false)
+  kycCompleted         Boolean       @default(false)
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime?     @updatedAt
+  approvedBy           String?
+  aadhaarFile          String?
+  bankAccounts         BankAccount[]
+  user                 Users         @relation(fields: [userId], references: [userid])
+  logs                 LogEntry[]
+
+  @@index([userId, businessType, kycCompleted])
+}
+
+model BankAccount {
+  id            Int        @id @default(autoincrement())
+  kycDetailsId  Int
+  accountNumber String
+  ifscCode      String
+  bankName      String
+  branchName    String
+  holderName    String
+  isVerified    Boolean    @default(false)
+  isActive      Boolean    @default(false)
+  deactivatedAt DateTime?
+  chequeImage   String?
+  verifiedAt    DateTime?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime?  @updatedAt
+  kycDetails    KycDetails @relation(fields: [kycDetailsId], references: [id], onDelete: Cascade)
+
+  @@unique([kycDetailsId, accountNumber])
+  @@index([kycDetailsId, isActive])
+}
+
+model LogEntry {
+  id                Int              @id @default(autoincrement())
+  timestamp         DateTime         @default(now())
+  level             LogLevel
+  message           String
+  metadata          Json?
+  entityType        String
+  entityId          Int?
+  usersId           String?
+  adminId           String?
+  ordersId          Int?
+  addressId         Int?
+  customerAddressId Int?
+  shipmentDetailsId Int?
+  packagesId        Int?
+  deliveryPartnerId Int?
+  rateMasterId      Int?
+  userRatesId       Int?
+  walletId          Int?
+  kycDetailsId      Int?
+  Address           Address?         @relation(fields: [addressId], references: [id])
+  Admin             Admin?           @relation(fields: [adminId], references: [userid])
+  CustomerAddress   CustomerAddress? @relation(fields: [customerAddressId], references: [customerId])
+  DeliveryPartner   DeliveryPartner? @relation(fields: [deliveryPartnerId], references: [partnerId])
+  KycDetails        KycDetails?      @relation(fields: [kycDetailsId], references: [id])
+  Orders            Orders?          @relation(fields: [ordersId], references: [id])
+  Packages          Packages?        @relation(fields: [packagesId], references: [PackageId])
+  RateMaster        RateMaster?      @relation(fields: [rateMasterId], references: [RateMasterId])
+  UserRates         UserRates?       @relation(fields: [userRatesId], references: [UserRateId])
+  Users             Users?           @relation(fields: [usersId], references: [userid])
+  Wallet            Wallet?          @relation(fields: [walletId], references: [id])
+
+  @@index([timestamp, level, entityType])
+  @@index([entityId])
+}
+
+model Notification {
+  id               Int              @id @default(autoincrement())
+  NotificationID   Int
+  userId           String
+  notificationType NotificationType
+  title            String
+  message          String
+  sentTime         DateTime?
+  isRead           Boolean          @default(false)
+  createdAt        DateTime         @default(now())
+  lastNotifiedDate DateTime         @default(now()) @db.Date
+  isManual         Boolean          @default(false)
+  createdBy        String?
+  LiveDate         DateTime         @default(now())
+  admin            Admin?           @relation(fields: [createdBy], references: [userid])
+  user             Users            @relation(fields: [userId], references: [userid])
+
+  @@index([userId, notificationType, isRead])
+  @@index([isRead, lastNotifiedDate])
+}
+
+model Coupon {
+  id          Int          @id @default(autoincrement())
+  Name        String       @unique
+  Description String
+  Amount      Decimal
+  Usage       Int
+  ExpiryDate  DateTime?
+  Category    String       @default("")
+  Tag         String       @default("")
+  MinAmount   Int          @default(0)
+  MaxAmount   Int?         @default(0)
+  IsEnable    Boolean      @default(true)
+  userCoupon  UserCoupon[]
+}
+
+model UserCoupon {
+  id            Int     @id @default(autoincrement())
+  CouponName    String
+  Usage_Count   Int     @default(0)
+  CouponID      Int?
+  UsedBy        String  @default("")
+  CouponDetails Coupon? @relation(fields: [CouponID], references: [id])
+  Users         Users   @relation(fields: [UsedBy], references: [userid])
+}
+
+model Channels {
+  id             Int          @id @default(autoincrement())
+  Channel_Name   Channel_Name @default(CUSTOM)
+  ShopName       String?
+  ShopDomain     String?      @unique
+  accessToken    String?      @unique
+  ConsumerKey    String?      @default("")
+  ConsumerSecret String?      @default("")
+  IsEnable       Boolean      @default(true)
+  usersId        Int?
+  Last_Synced    DateTime?
+  isInstalled    Boolean      @default(true)
+  DefaultDomain  String?
+  Users          Users?       @relation(fields: [usersId], references: [id])
+  Orders         Orders[]
+}
+
+model PersonalInformation {
+  id                              Int       @id @default(autoincrement())
+  userId                          String    @unique
+  aadhaarStatus                   String?
+  aadhaarResponseId               String?
+  aadhaarNumber                   String?
+  aadhaarName                     String?
+  aadhaarAddress                  String?
+  aadhaarDob                      String?
+  aadhaarGender                   String?
+  aadhaarPhoto                    String?
+  aadhaarMessage                  String?
+  aadhaarCareOf                   String?
+  aadhaarEmail                    String?
+  aadhaarYearOfBirth              String?
+  aadhaarMobileHash               String?
+  aadhaarSplitAddressCountry      String?
+  aadhaarSplitAddressDist         String?
+  aadhaarSplitAddressHouse        String?
+  aadhaarSplitAddressLandmark     String?
+  aadhaarSplitAddressPincode      String?
+  aadhaarSplitAddressPo           String?
+  aadhaarSplitAddressState        String?
+  aadhaarSplitAddressStreet       String?
+  aadhaarSplitAddressSubdist      String?
+  aadhaarSplitAddressVtc          String?
+  panResponseId                   String?
+  panNumber                       String?
+  panName                         String?
+  panFatherName                   String?
+  panType                         String?
+  gstinResponseId                 String?
+  gstinNumber                     String?
+  gstinLegalName                  String?
+  gstinTradeName                  String?
+  gstinCenterJurisdiction         String?
+  gstinStateJurisdiction          String?
+  gstinDateOfRegistration         DateTime?
+  gstinConstitutionOfBusiness     String?
+  gstinTaxpayerType               String?
+  gstinStatus                     String?
+  gstinLastUpdateDate             DateTime?
+  gstinNatureOfBusinessActivities String[]
+  gstinPrincipalPlaceAddress      String?
+  gstinAdditionalAddresses        Json?
+  bankResponseId                  String?
+  bankAccountNumber               String?
+  bankName                        String?
+  bankIfsc                        String?
+  bankBranch                      String?
+  bankCity                        String?
+  bankMicr                        String?
+  bankNameAtBank                  String?
+  bankUtr                         String?
+  bankAccountStatus               String?
+  bankAccountStatusCode           String?
+  createdAt                       DateTime  @default(now())
+  updatedAt                       DateTime  @updatedAt
+  aadhaarFile                     String?
+  user                            Users     @relation(fields: [userId], references: [userid])
+}
+
+model CRM_Users {
+  id                     String                  @id @unique
+  email                  String                  @unique
+  fullName               String
+  phone                  String
+  imageUrl               String?
+  lastActiveAt           DateTime?
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  isAuthorized           Boolean
+  isActive               Boolean                 @default(true)
+  departmentId           Int?
+  roleId                 Int?
+  permissions            String[]
+  additional_permissions String[]
+  AuditLog               CRM_AuditLog[]
+  CRM_ManualCalls        CRM_ManualCalls[]
+  assignedTickets        CRM_Tickets[]           @relation("AssignedTickets")
+  raisedTickets          CRM_Tickets[]           @relation("RaisedTickets")
+  reOpenedTickets        CRM_Tickets[]           @relation("ReOpenedTickets")
+  tickets                CRM_Tickets[]
+  department             CRM_Department?         @relation(fields: [departmentId], references: [id])
+  role                   CRM_Role?               @relation(fields: [roleId], references: [id])
+  allotted_3PL           DeliveryPartner[]
+  AuditLog_HS            HighShipping_AuditLog[]
+  tickets_HS             HighShipping_Tickets[]
+  allotted_Seller        Users[]
+}
+
+model HighShipping_Tickets {
+  id              Int                        @id @unique
+  awbNumber       String
+  orderId         String?
+  deliveryPartner String?
+  actionType      String
+  ticketDate      DateTime
+  ticketStatus    HSStatus                   @default(UNDER_REVIEW)
+  tat             Int?
+  assignedTo      String?
+  closedBy        String?
+  closedDate      DateTime?
+  raiseBy         String?
+  reOpenBy        String?
+  reOpenDate      String?
+  sellerId        Int?
+  userId          String?
+  comments        HighShipping_Comments[]
+  files           HighShipping_TicketFiles[]
+  seller          Users?                     @relation(fields: [sellerId], references: [id])
+  user            CRM_Users?                 @relation(fields: [userId], references: [id])
+
+  @@index([awbNumber, orderId])
+  @@index([sellerId])
+}
+
+model HighShipping_Comments {
+  id        Int                  @id @unique
+  content   String
+  addedBy   String?
+  createdAt DateTime             @default(now())
+  ticketId  Int
+  ticket    HighShipping_Tickets @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId])
+}
+
+model HighShipping_TicketFiles {
+  id         Int                  @id @unique
+  fileType   HSFileType
+  fileUrl    String
+  uploadedAt DateTime             @default(now())
+  uploadBy   UploadUserType       @default(USER)
+  ticketId   Int
+  ticket     HighShipping_Tickets @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId])
+}
+
+model HighShipping_AuditLog {
+  id        Int       @id @unique
+  action    String
+  details   String?
+  timestamp DateTime  @default(now())
+  userId    String
+  user      CRM_Users @relation(fields: [userId], references: [id])
+
+  @@index([userId, timestamp])
+}
+
+model CRM_Tickets {
+  id                  Int               @id @unique
+  awbNumber           String
+  orderId             String?
+  deliveryPartner     String?
+  actionTypeId        Int
+  ticketDate          DateTime
+  ticketStatus        TicketStatus      @default(OPEN)
+  assignedTo          String?
+  tat                 Int?
+  closedBy            String?
+  closedDate          DateTime?
+  raiseBy             String?
+  reOpenBy            String?
+  reOpenDate          DateTime?
+  sellerId            String?
+  userId              String?
+  departmentId        Int?
+  markAsProof         Boolean           @default(false)
+  closedInTat         Boolean?
+  closingActionTypeId Int?
+  updatedAt           DateTime?         @updatedAt
+  assignedToDate      DateTime?         @db.Timestamp(6)
+  InformedToSeller    DateTime?
+  comments            CRM_Comments[]
+  exotelCalls         CRM_ExotelCalls[]
+  CRM_ManualCalls     CRM_ManualCalls[]
+  files               CRM_TicketFiles[]
+  actionType          CRM_ActionType    @relation("TicketActionType", fields: [actionTypeId], references: [id])
+  assignedToUser      CRM_Users?        @relation("AssignedTickets", fields: [assignedTo], references: [id])
+  closingActionType   CRM_ActionType?   @relation("ClosingTicketActionType", fields: [closingActionTypeId], references: [id])
+  deliveryPartnerRef  DeliveryPartner?  @relation(fields: [deliveryPartner], references: [partnerName])
+  department          CRM_Department?   @relation(fields: [departmentId], references: [id])
+  raisedByUser        CRM_Users?        @relation("RaisedTickets", fields: [raiseBy], references: [id])
+  reOpenedByUser      CRM_Users?        @relation("ReOpenedTickets", fields: [reOpenBy], references: [id])
+  seller              Users?            @relation(fields: [sellerId], references: [userid])
+  user                CRM_Users?        @relation(fields: [userId], references: [id])
+  RTO_BS_Register     RTO_BS_Register[]
+
+  @@unique([awbNumber, actionTypeId, departmentId])
+  @@index([awbNumber, orderId])
+  @@index([sellerId])
+  @@index([actionTypeId])
+  @@index([departmentId])
+  @@index([closingActionTypeId])
+}
+
+model CRM_ExotelCalls {
+  id           Int         @id @default(autoincrement())
+  callSid      String      @unique
+  from         String
+  to           String
+  callerId     String
+  status       String
+  startTime    DateTime?
+  endTime      DateTime?
+  duration     Int?
+  recordingUrl String?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  ticketId     Int
+  ticket       CRM_Tickets @relation(fields: [ticketId], references: [id])
+
+  @@index([ticketId])
+}
+
+model CRM_Comments {
+  id        Int         @id @unique
+  content   String
+  addedBy   String?
+  createdAt DateTime    @default(now())
+  ticketId  Int
+  ticket    CRM_Tickets @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId])
+}
+
+model CRM_TicketFiles {
+  id         Int         @id @unique
+  fileType   CRMFileType
+  fileUrl    String
+  uploadedAt DateTime    @default(now())
+  ticketId   Int
+  ticket     CRM_Tickets @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId])
+}
+
+model CRM_ActionType {
+  id                  Int               @id @unique
+  name                String
+  departmentId        Int
+  routeToDepartmentId Int
+  isClosingAction     Boolean           @default(false)
+  createNewTicket     Boolean           @default(false)
+  tat                 Int?
+  department          CRM_Department    @relation("DepartmentActionTypes", fields: [departmentId], references: [id])
+  routeToDepartment   CRM_Department    @relation("RoutingDepartment", fields: [routeToDepartmentId], references: [id])
+  tickets             CRM_Tickets[]     @relation("TicketActionType")
+  closingTickets      CRM_Tickets[]     @relation("ClosingTicketActionType")
+  rtoRegisters        RTO_BS_Register[]
+
+  @@unique([name, departmentId, routeToDepartmentId])
+  @@index([departmentId])
+  @@index([routeToDepartmentId])
+}
+
+model CRM_AuditLog {
+  id        Int       @id @unique
+  action    String
+  details   String?
+  timestamp DateTime  @default(now())
+  userId    String
+  user      CRM_Users @relation(fields: [userId], references: [id])
+
+  @@index([userId, timestamp])
+}
+
+model CRM_Department {
+  id                Int               @id @default(autoincrement())
+  name              CRMDepartment     @unique
+  actionTypes       CRM_ActionType[]  @relation("DepartmentActionTypes")
+  routedActionTypes CRM_ActionType[]  @relation("RoutingDepartment")
+  roles             CRM_Role[]
+  CRM_Tickets       CRM_Tickets[]
+  users             CRM_Users[]
+  rtoRegisters      RTO_BS_Register[]
+}
+
+model CRM_Role {
+  id           Int              @id @default(autoincrement())
+  name         CRMRole
+  departmentId Int?
+  isGlobal     Boolean          @default(false)
+  department   CRM_Department?  @relation(fields: [departmentId], references: [id])
+  users        CRM_Users[]
+  permissions  CRM_Permission[] @relation("CRM_PermissionToCRM_Role")
+
+  @@unique([name, departmentId])
+}
+
+model RTO_BS_Register {
+  id           Int            @id @unique
+  ticketId     Int
+  awb          String         @unique
+  actionTypeId Int
+  proof        Boolean
+  refunded     Boolean
+  remarks      String?
+  departmentId Int
+  actionType   CRM_ActionType @relation(fields: [actionTypeId], references: [id])
+  department   CRM_Department @relation(fields: [departmentId], references: [id])
+  ticket       CRM_Tickets    @relation(fields: [ticketId], references: [id])
+
+  @@index([actionTypeId])
+  @@index([departmentId])
+}
+
+model CRM_Permission {
+  id       Int        @id @default(autoincrement())
+  name     String     @unique
+  CRM_Role CRM_Role[] @relation("CRM_PermissionToCRM_Role")
+}
+
+model GlobalOrderCounter {
+  id        Int      @id @default(autoincrement())
+  lastId    Int      @default(1000)
+  updatedAt DateTime @updatedAt
+
+  @@map("global_order_counter")
+}
+
+model Credits {
+  id              Int              @id @default(autoincrement())
+  userId          String
+  customerName    String
+  status          String?
+  transactionDate DateTime
+  debitedAmount   Decimal
+  creditedAmount  Decimal
+  balance         Decimal
+  Credit_Type     String
+  description     String
+  orderId         Int?
+  tags            TransactionTags?
+  awbNumber       String?
+  CreditedBy      String?
+  Orders          Orders?          @relation(fields: [awbNumber], references: [awbNumber])
+  userWallet      Users            @relation(fields: [userId], references: [userid])
+}
+
+model Card_Limit {
+  id              Int              @id @default(autoincrement())
+  userId          String
+  customerName    String
+  status          String?
+  transactionDate DateTime
+  debitedAmount   Decimal
+  creditedAmount  Decimal
+  balance         Decimal
+  tags            TransactionTags?
+  description     String
+  orderId         Int?
+  awbNumber       String?
+  Orders          Orders?          @relation(fields: [awbNumber], references: [awbNumber])
+  userWallet      Users            @relation(fields: [userId], references: [userid])
+}
+
+model Remittance {
+  id                Int              @id @default(autoincrement())
+  email             String
+  status            RemittanceStatus
+  COD_Amount        Decimal
+  PaymentDate       DateTime
+  Fright_Charges    Decimal
+  Remittance_Amount Decimal
+  start_Date        DateTime
+  end_Date          DateTime
+  Transaction_ID    String
+  COD_Percentage    Decimal
+  IsLast            RemittanceDate
+  Orders            Orders[]
+  Users             Users            @relation(fields: [email], references: [email])
+  TrackingCard      TrackingCard[]
+}
+
+model Token {
+  id        Int      @id @default(autoincrement())
+  userId    String   @unique
+  token     String   @unique
+  createdAt DateTime @default(now())
+  Users     Users    @relation(fields: [userId], references: [userid], onDelete: Cascade)
+}
+
+model PincodeData {
+  pincode  Int    @id
+  city     String
+  district String
+  state    String
+}
+
+model Log {
+  id         Int         @id @default(autoincrement())
+  timestamp  DateTime    @default(now())
+  panelType  PANELTYPE
+  level      LOGLEVEL
+  actionType ACTIONTYPE
+  userId     String
+  userEmail  String
+  message    String
+  metadata   Json?
+  ipAddress  String?
+  userAgent  String?
+  path       String?
+  method     METHODTYPE?
+  statusCode Int?
+  duration   Int?
+}
+
+model CRM_ManualCalls {
+  id           Int         @id @default(autoincrement())
+  ticketId     Int
+  recordingUrl String
+  uploadedBy   String
+  uploadedAt   DateTime    @default(now())
+  callDuration Int?
+  CRM_Tickets  CRM_Tickets @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  CRM_Users    CRM_Users   @relation(fields: [uploadedBy], references: [id])
+
+  @@index([ticketId])
+  @@index([uploadedBy])
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model new_ordertmp {
+  awb       String?      @db.VarChar(255)
+  status    OrderStatus?
+  timestamp String?      @db.VarChar(255)
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model orderBackup {
+  id                    Int?
+  orderId               Int?
+  orderRate             Int?
+  CODcharges            Int?
+  usersId               String?
+  status                OrderStatus?
+  shippingDate          DateTime?
+  invoiceDate           DateTime?
+  pickupTime            DateTime?
+  paymentMode           String?
+  shippingMode          String?
+  buddyshieldBoolean    Boolean?
+  deadWeight            Decimal?
+  length                Decimal?
+  breadth               Decimal?
+  height                Decimal?
+  totalOrderValue       Decimal?
+  applicableWeight      Decimal?
+  isDangerous           Boolean?
+  deliveryType          deliveryType?
+  createdAt             DateTime?
+  awbNumber             String?
+  deliveryPartner       String?
+  agentAddressId        Int?
+  rtoAgentAddressId     Int?
+  reverseAgentAddressId Int?
+  forwardCustomerId     Int?
+  reverseCustomerId     Int?
+  responseOrderId       String?
+  ChannelOrder_Id       String?
+  Channels              String?
+  ShopDomain            String?
+  Channel_OrderNo       Int?
+  BS_Refund             Boolean?
+  highshipping_decision HighShippingDecision?
+  remittanceId          Int?
+  Zone                  String?
+  RtoAwb                String?
+  payedBy               String?
+  Combo_Amount          String?
+  vasMetadata           Json?                 @db.Json
+  shipmentCreationDate  DateTime?
+  AtsLabel              String?
+  SS_Delivery_Code      String?
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model delivery_data {
+  awb       String?      @db.VarChar(255)
+  status    OrderStatus?
+  timestamp String?      @db.VarChar(255)
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model rto_awbtmp {
+  awb    String? @db.VarChar(255)
+  rtoawb String? @db.VarChar(255)
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model tmp_ticket {
+  awb String? @db.VarChar(255)
+
+  @@ignore
+}
+
+enum NDRStatus {
+  OPEN
+  REQUESTED
+  CLOSED
+}
+
+enum UploadUserType {
+  USER
+  CRM_USER
+}
+
+enum NotificationType {
+  MANUAL
+  KYC_PENDING
+  NEGATIVE_WALLET_BALANCE
+  LOW_BALANCE
+  WELCOME
+  DELETED
+}
+
+enum LogLevel {
+  INFO
+  WARNING
+  ERROR
+  DEBUG
+}
+
+enum HighShippingDecision {
+  DECISION_PENDING
+  NOT_APPLIED
+  Applied
+}
+
+enum BuddyShieldUser {
+  NOT_STARTED
+  IN_SSPROGRESS
+  CLOSED
+}
+
+enum Categories {
+  Others
+  Clothes
+  Accessories
+  AutomotiveAndAccessories
+  BabyAndToddler
+  BeautyAndPersonalCare
+  BooksMediaAndMagazines
+  ComputersAndAccessories
+  ConsumerElectronics
+  GroceryAndGourmetFood
+  FurnitureAndDecor
+  HealthAndHousehold
+  HomeAndKitchen
+  JewelryAndWatches
+  MusicalInstruments
+  OfficeProducts
+  OutdoorsAndSports
+  PetSupplies
+  ShoesAndHandbags
+  SoftwareAndServices
+  ToysAndGames
+  ToolsAndHomeImprovement
+}
+
+enum OrderStatus {
+  NEW
+  READY_TO_SHIP
+  IN_TRANSIT
+  OUT_FOR_DELIVERY
+  DELIVERED
+  RTO
+  RTO_IN_TRANSIT
+  RTO_DELIVERED
+  FAILED_DELIVERY
+  CANCELLED
+  DELETED
+}
+
+enum deliveryType {
+  FORWARD
+  REVERSE
+}
+
+enum PaymentMethod {
+  PREPAID
+  POSTPAID_COD
+  POSTPAID_INVOICE
+}
+
+enum AdminRole {
+  TEST
+  KAM
+  LOGISTIC
+  SUPPORT
+  FINANCE
+  BUDDYSHIELD
+}
+
+enum SearchTransaction {
+  WALLET
+  CREDITS
+  CARD
+  ORDER
+}
+
+enum Negotiation {
+  First_Negotiation
+  Second_Negotiation
+  Third_Negotiation
+  Fourth_Negotiation
+  Fifth_Negotiation
+  Sixth_Negotiation
+  Seventh_Negotiation
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum KycStatus {
+  DONE
+  PENDING
+  APPROVAL_PENDING
+}
+
+enum ShippingMode {
+  SURFACE
+  AIR
+}
+
+enum BusinessType {
+  INDIVIDUAL
+  SOLE_PROPRIETOR
+  COMPANY
+}
+
+enum StoreType {
+  SHOPIFY
+  WOOCOMMERCE
+  UNICOMMERCE
+}
+
+enum TransactionTags {
+  wallet
+  orders
+  admin
+  Credits
+  CardLimit
+}
+
+enum Channel_Name {
+  SHOPIFY
+  WOOCOMMERCE
+  UNICOMMERCE
+  CUSTOM
+}
+
+enum paymentSheet {
+  Weekly
+  Early
+  all
+}
+
+enum CRMFileType {
+  AUDIO
+  VIDEO
+  IMAGE
+  DOCUMENT
+}
+
+enum TicketStatus {
+  OPEN
+  CLOSED
+  REOPEN
+}
+
+enum CRMDepartment {
+  KAM
+  LOGISTICS
+  SUPPORT
+  FINANCE
+  NDR
+  SELLER
+  SUPERADMIN
+  BUDDYSHIELD
+  VALIDBUDDY
+  DELIVERYSURE
+  SALES
+}
+
+enum CRMRole {
+  SUPERADMIN
+  MANAGER
+  EXECUTIVE
+  TEAMLEADER
+}
+
+enum HSFileType {
+  AUDIO
+  VIDEO
+  IMAGE
+  DOCUMENT
+}
+
+enum BSFileTypes {
+  AUDIO
+  VIDEO
+  IMAGE
+  DOCUMENT
+}
+
+enum HSStatus {
+  UNDER_REVIEW
+  AWAITING_PROOF
+  REJECTED
+  REFUND
+  REFUNDED
+}
+
+enum BSStatus {
+  OPEN
+  CLOSED
+  REOPEN
+}
+
+enum RemittanceDate {
+  LATEST
+  PREVIOUS
+  REST
+}
+
+enum RemittanceStatus {
+  PAID
+  PENDING
+  HOLD
+}
+
+enum Payment_By {
+  WALLET
+  CREDITS
+  CARD_LIMIT
+  WALLET__CREDITS
+  WALLET__CARDLIMIT
+  CREDITS_CARDLIMIT
+  WALLET_CREDITS_CARDLIMIT
+  NONE
+}
+
+enum ACTIONTYPE {
+  LOGIN
+  LOGOUT
+  CREATE
+  UPDATE
+  DELETE
+  VIEW
+  EXPORT
+  OTHER
+}
+
+enum LOGLEVEL {
+  INFO
+  WARNING
+  ERROR
+  DEBUG
+}
+
+enum METHODTYPE {
+  GET
+  POST
+  PUT
+  DELETE
+}
+
+enum PANELTYPE {
+  ADMIN
+  CRM
+  SELLER
+}
