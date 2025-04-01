@@ -222,13 +222,14 @@ type AddressType = {
     invalidOrders?: number;
   };
 
-  export type OrderResponse = BaseOrderResponse & { atsLabel?: string | null };
+  export type OrderResponse = BaseOrderResponse & { atsLabel?: string | null, messageId?: string | null, userId? : string | null };
 
   
   
  export type BulkOrderResult = {
     success: boolean;
     message: string;
+    messageId?: string;
     orderResponses?: OrderResponse[];
     insufficientBalance?: boolean;
     processedOrders?: number;

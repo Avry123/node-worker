@@ -1,26 +1,74 @@
-// worker.js
-import { SQSClient, ReceiveMessageCommand, DeleteMessageCommand } from "@aws-sdk/client-sqs";
+import { SQSClient, ReceiveMessageCommand, DeleteMessageCommand, SendMessageCommand } from "@aws-sdk/client-sqs";
 import appConfig from "./lib/queue";
 import { handleBulkOrderForApi } from "./actions/orders";
 
-
 const sqsClient = new SQSClient({
-    region: appConfig.awsConfig.region,
-    credentials: {
-      accessKeyId: appConfig.awsConfig.accessKeyId,
-      secretAccessKey: appConfig.awsConfig.secretAccessKey,
-    },
-  });
+  region: appConfig.awsConfig.region,
+  credentials: {
+    accessKeyId: appConfig.awsConfig.accessKeyId,
+    secretAccessKey: appConfig.awsConfig.secretAccessKey,
+  },
+});
 
-async function receiveMessages() {
-  const params = {
-    QueueUrl: appConfig.primaryQueueUrl, // Use the primary queue URL
-    MaxNumberOfMessages: 10, // Maximum number of messages to retrieve in one call
-    WaitTimeSeconds: 20, // Long polling - wait up to 20 seconds for messages to arrive
+async function sendToResponseQueue(orderResult: any) {
+  const responseparams = {
+    QueueUrl: appConfig.responseQueueUrl, // URL of the response queue
+    MessageBody: JSON.stringify(orderResult),
   };
 
   try {
-    // Receive messages from the SQS queue
+    let a = await sqsClient.send(new SendMessageCommand(responseparams));
+    console.log("Line 21 ", a);
+  } catch (error) {
+    console.error("Error sending order result to response queue:", error);
+  }
+}
+
+async function processMessage(message : any) {
+  try {
+    if (!message.Body) {
+      console.error("Message body is empty or undefined.");
+      return;
+    }
+
+    const { messageId, completOrderPass } = JSON.parse(message.Body);
+
+    // Process order
+    try {
+      const response = await handleBulkOrderForApi(completOrderPass, messageId);
+      console.log("Order processed successfully:", response.data?.orderResponses);
+      console.log('Line 40')
+      if (response.data?.orderResponses && response.data?.orderResponses.length === 1) {
+        console.log('Line 41')
+        sendToResponseQueue(response.data?.orderResponses[0]);
+      }
+
+    } catch (error) {
+      console.error("Error processing order:", error);
+      return; // Do not delete message if processing fails
+    }
+
+    // Delete message after successful processing
+    await sqsClient.send(new DeleteMessageCommand({
+      QueueUrl: appConfig.primaryQueueUrl,
+      ReceiptHandle: message.ReceiptHandle,
+    }));
+
+    console.log(`Message ${messageId} deleted from queue.`);
+
+  } catch (error) {
+    console.error("Error processing message:", error);
+  }
+}
+
+async function receiveMessages() {
+  const params = {
+    QueueUrl: appConfig.primaryQueueUrl,
+    MaxNumberOfMessages: 10,
+    WaitTimeSeconds: 20, // Long polling
+  };
+
+  try {
     const data = await sqsClient.send(new ReceiveMessageCommand(params));
 
     if (!data.Messages || data.Messages.length === 0) {
@@ -28,58 +76,28 @@ async function receiveMessages() {
       return;
     }
 
-    // Process each message in the batch
-    for (const message of data.Messages) {
-      try {
-        if (!message.Body) {
-          console.error("Message body is empty or undefined.");
-          continue;
-        }
-        let data = JSON.parse(message.Body);
-        let messageId = data.messageId;
-        let orderData = data.orderData;
-        console.log('Line 41 ', messageId);
-        // After successful processing, delete the message from the queue
-        try {
-          let createOrder = async () => {
-            let response = await handleBulkOrderForApi(orderData);
-            let a = response.data?.orderResponses;
-            console.log('Line 47', a)
-            return;
-          };
-         await createOrder();
-        } catch (error) {
-          console.error("Error creating order:", error);
-        }
-        await sqsClient.send(
-          new DeleteMessageCommand({
-            QueueUrl: appConfig.primaryQueueUrl,
-            ReceiptHandle: message.ReceiptHandle,
-          })
-        );
-
-      
-      } catch (error) {
-        console.error("Error processing message:", error);
-        // You can implement retry logic here if needed
-      }
-    }
+    // Process messages concurrently
+   let a = await Promise.allSettled(data.Messages.map(processMessage));
+   console.log('Line 61 ', a)
   } catch (error) {
     console.error("Error receiving messages from SQS:", error);
   }
 }
 
-// Continuously poll the SQS queue for new messages
 async function startWorker() {
   console.log("SQS Worker started. Listening for messages...");
+  
+  process.on("SIGINT", () => {
+    console.log("Shutting down worker...");
+    process.exit(0);
+  });
+
   while (true) {
     await receiveMessages();
-    // Add a delay between polls (e.g., 5 seconds)
-    await new Promise((resolve) => setTimeout(resolve, 5000));
+    await new Promise((resolve) => setTimeout(resolve, 5000)); // Add delay to avoid excessive API calls
   }
 }
 
-// Start the worker
 startWorker().catch((error) => {
   console.error("Worker encountered an error:", error);
 });

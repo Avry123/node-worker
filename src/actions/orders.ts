@@ -31,10 +31,11 @@ export async function generateOrderId(): Promise<number> {
 }
 
 
-export async function handleBulkOrderForApi(data: CompleteOrderTypeApi) {
+export async function handleBulkOrderForApi(data: CompleteOrderTypeApi,messageId: string) {
     try {
-      
-      const result = await bulkOrders_with_3pl_preference_for_api(data);
+    
+      const result = await bulkOrders_with_3pl_preference_for_api(data, messageId);
+    
       return {
         success: true,
         data: result,
@@ -49,6 +50,7 @@ export async function handleBulkOrderForApi(data: CompleteOrderTypeApi) {
 
   export async function bulkOrders_with_3pl_preference_for_api(
     data: CompleteOrderTypeApi,
+    messageId: string,
   ): Promise<BulkOrderResult> {
     "use server";
     const startTime = Date.now();
@@ -65,13 +67,14 @@ export async function handleBulkOrderForApi(data: CompleteOrderTypeApi) {
         },
       });
       const userBuddyShieldStatus = user?.buddyShield || false;
-      console.log(`User buddyShield status: ${userBuddyShieldStatus}`);
-  
+
       // Cache currentUser
       const currentUser = await fetchUserData(data.orderData.usersId);
       if (!currentUser) {
-        return { success: false, message: "No current user found" };
+        return { success: false, message: "No current user found", messageId: messageId };
       }
+
+      
   
       // Get user's partner preferences
       const userPartnerPreferences = await getUserPartnerPreferences(currentUser);
@@ -79,7 +82,7 @@ export async function handleBulkOrderForApi(data: CompleteOrderTypeApi) {
         `User partner preferences: ${userPartnerPreferences.join(", ")}`,
       );
       if (userPartnerPreferences.length === 0) {
-        return { success: false, message: "Please select partner preferences" };
+        return { success: false, message: "Please select partner preferences", messageId: messageId };
       }
   
       // Fetch pickup addresses
@@ -90,6 +93,7 @@ export async function handleBulkOrderForApi(data: CompleteOrderTypeApi) {
         return {
           success: false,
           message: "Please create a warehouse before placing orders.",
+          messageId: messageId
         };
       }
   
@@ -113,13 +117,18 @@ export async function handleBulkOrderForApi(data: CompleteOrderTypeApi) {
             orderId: data.orderData.orderId?.toString() || "N/A",
             status: "failed",
             message: `No valid pickup address found for tag: ${data.orderData.warehouseName}`,
+            messageId: messageId,
+            userId: data.orderData.usersId,
           });
           return {
             success: false,
             message: "Invalid pickup address",
             orderResponses,
+            messageId: messageId
           };
         }
+
+        console.log('Line 130 ', userPartnerPreferences);
   
         // Select delivery partners
         if (responseWarehouse.data && responseWarehouse.data.length > 0) {
@@ -135,12 +144,15 @@ export async function handleBulkOrderForApi(data: CompleteOrderTypeApi) {
             orderResponses.push({
               orderId: data.orderData.orderId?.toString() || "N/A",
               status: "failed",
+              messageId: messageId,
+              userId: data.orderData.usersId,
               message: `No serviceable partner found for Pickup Pincode ${data.orderData.warehouseName} and Delivery Pincode ${responseWarehouse.data[0].pincode}`,
             });
             return {
               success: false,
               message: "No serviceable partners",
               orderResponses,
+              messageId: messageId
             };
           }
   
@@ -171,6 +183,8 @@ export async function handleBulkOrderForApi(data: CompleteOrderTypeApi) {
                 buddyshieldBoolean: data.orderData.buddyShield,
               },
             });
+
+            
   
             // Create customer address
             const customerAddress = await prisma.customerAddress.create({
@@ -254,7 +268,7 @@ export async function handleBulkOrderForApi(data: CompleteOrderTypeApi) {
                   data.orderData.isDangerousGoods === "y" ? true : false,
               };
   
-              console.log("Line 1387 ", rateData);
+             
   
               // Rates are coming from api.
               // http://localhost:3001/api/seller/rates
@@ -287,7 +301,7 @@ export async function handleBulkOrderForApi(data: CompleteOrderTypeApi) {
               );
   
               const ratesApi = await response.json();
-              console.log("Line 1397 ", ratesApi);
+             
               const rates = ratesApi.rate.data[0];
               if (!rates) {
                 console.error(
@@ -298,7 +312,7 @@ export async function handleBulkOrderForApi(data: CompleteOrderTypeApi) {
               }
   
               const selectedPartnerRate = rates;
-              console.log("Line 1404 ", selectedPartnerRate);
+              
               if (!selectedPartnerRate) {
                 console.error(
                   `No rates available for partner: ${selectedPartner}`,
@@ -313,7 +327,7 @@ export async function handleBulkOrderForApi(data: CompleteOrderTypeApi) {
                 newOrder.id,
                 data.orderData.usersId,
               );
-              console.log("Line 1414 ", walletBalance);
+              
   
               if (walletBalance?.status !== "OK") {
                 insufficientBalance = true;
@@ -321,6 +335,8 @@ export async function handleBulkOrderForApi(data: CompleteOrderTypeApi) {
                   orderId: newOrder.orderId.toString(),
                   status: "failed",
                   message: "Insufficient wallet balance",
+                  userId: data.orderData.usersId,
+                  messageId: messageId
                 });
                 break;
               }
@@ -330,10 +346,9 @@ export async function handleBulkOrderForApi(data: CompleteOrderTypeApi) {
                 newOrder.id,
                 selectedPartner,
               );
-              console.log("Line 1428 ", shippingOrder);
+             
               if (shippingOrder.success && shippingOrder.awbNumber) {
-                console.log("Line 1430 ", shippingOrder);
-                console.log('Line 336 ', selectedPartner);
+              
                 // Update order status and AWB number
                 let b = await prisma.orders.update({
                   where: { id: newOrder.id },
@@ -380,6 +395,8 @@ export async function handleBulkOrderForApi(data: CompleteOrderTypeApi) {
                       orderId: newOrder.orderId.toString(),
                       status: "failed",
                       message: "Failed to deduct wallet balance",
+                      messageId: messageId,
+                      userId: data.orderData.usersId,
                     });
                     break;
                   }
@@ -405,6 +422,8 @@ export async function handleBulkOrderForApi(data: CompleteOrderTypeApi) {
                     ? selectedPartnerRate.totalRate
                     : 0,
                   deliveryPartner: selectedPartner,
+                  messageId: messageId,
+                  userId: data.orderData.usersId
                 });
   
                 processedOrders++;
@@ -432,6 +451,8 @@ export async function handleBulkOrderForApi(data: CompleteOrderTypeApi) {
             orderResponses.push({
               orderId: newOrder.id.toString() || "N/A",
               status: "failed",
+              messageId: messageId,
+              userId: data.orderData.usersId,
               message: `None of the delivery partners provided service for this order. Order is stored in NEW bucket the orderId is ${newOrder.id} `,
             });
           }
@@ -441,6 +462,8 @@ export async function handleBulkOrderForApi(data: CompleteOrderTypeApi) {
         orderResponses.push({
           orderId: data.orderData.orderId?.toString() || "N/A",
           status: "failed",
+          messageId: messageId,
+          userId: data.orderData.usersId,
           message:
             error instanceof Error ? error.message : "Unknown error occurred",
         });
@@ -463,6 +486,7 @@ export async function handleBulkOrderForApi(data: CompleteOrderTypeApi) {
         orderResponses,
         insufficientBalance,
         processedOrders,
+        messageId: messageId
       };
     } catch (error) {
       return {
@@ -473,6 +497,7 @@ export async function handleBulkOrderForApi(data: CompleteOrderTypeApi) {
         orderResponses,
         insufficientBalance: true,
         processedOrders,
+        messageId: messageId
       };
     }
   }

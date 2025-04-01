@@ -51,6 +51,9 @@ export async function selectPartnerForApi(
   
       serviceablePartners = (await findServiceablePartners(deliveryData)) || [];
   
+
+      console.log('Line 55 ', serviceablePartners);
+
       if (serviceablePartners.length === 0) {
         console.log("No serviceable partners available.");
         return null;
@@ -126,6 +129,8 @@ export async function selectPartnerForApi(
           isServiceable: partnerServiceable,
           matchedString: preferredPartnerMatch,
         });
+
+        console.log('Line 130 ', preferredPartner);
   
         if (partnerServiceable && isPartnerValid(preferredPartner)) {
           console.log("Line 309 triggered");
@@ -146,7 +151,8 @@ export async function selectPartnerForApi(
           }
         }
         if (listOfDefaultServiceablePartners.length > 0) {
-          return listOfDefaultServiceablePartners;
+          // return listOfDefaultServiceablePartners;
+          return ['delhivery air' ]
         } else {
           // If no delivery partner is serviceable return null.
           return null;
