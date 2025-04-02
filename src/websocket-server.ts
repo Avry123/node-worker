@@ -1,49 +1,62 @@
-const http = require("http");
-const { Server } = require("socket.io");
+import WebSocket, { WebSocketServer } from "ws";
 
-// Create an HTTP server
-const server = http.createServer();
+interface UserConnections {
+  [userId: string]: WebSocket;
+}
 
-console.log('Line 7 ', server);
-// Initialize Socket.IO
-const io = new Server(server, {
-  cors: {
-    origin: "*", // Allow all origins (you can restrict this to your frontend URL)
-    methods: ["GET", "POST"],
-  },
-});
+const wss = new WebSocketServer({ port: 4000 }); // WebSocket server running on port 8080
+const userConnections: UserConnections = {}; // Store connected clients
 
-// Store user connections by user ID
-const userConnections: { [key: string]: string } = {};
+console.log("🚀 WebSocket server started on ws://localhost:8080");
 
-// Handle connections
-io.on("connection", (socket : any) => {
-  console.log("A client connected:", socket.id);
+wss.on("connection", (ws: WebSocket) => {
+  console.log("✅ New WebSocket client connected");
 
-  // Listen for user authentication (e.g., seller ID)
-  socket.on("authenticate", (userId : any) => {
-    console.log(`User ${userId} authenticated`);
-    userConnections[userId] = socket.id; // Map user ID to socket ID
-  });
-
-  // Handle disconnections
-  socket.on("disconnect", () => {
-    console.log("A client disconnected:", socket.id);
-    // Remove user from connections
-    for (const [userId, socketId] of Object.entries(userConnections)) {
-      if (socketId === socket.id) {
-        delete userConnections[userId];
-        break;
+  ws.on("message", (message: string) => {
+    try {
+      const data = JSON.parse(message);
+      if (data.type === "register" && data.userId) {
+        userConnections[data.userId] = ws; // Associate user ID with the WebSocket connection
+        console.log(`👤 User ${data.userId} registered for updates`);
+        ws.send(JSON.stringify({ message: "Registration successful" }));
       }
+    } catch (error) {
+      console.error("❌ Invalid WebSocket message format", error);
+      ws.send(JSON.stringify({ error: "Invalid message format" }));
     }
   });
+
+  ws.on("close", () => {
+    console.log("❌ WebSocket client disconnected");
+    // Remove disconnected clients
+    Object.keys(userConnections).forEach((userId) => {
+      if (userConnections[userId] === ws) {
+        delete userConnections[userId];
+        console.log(`👤 User ${userId} removed from active connections`);
+      }
+    });
+  });
+
+  ws.on("error", (err) => {
+    console.error("⚠️ WebSocket error:", err);
+  });
+
+  // Heartbeat mechanism to detect inactive clients
+  ws.on("pong", () => {
+    (ws as any).isAlive = true;
+  });
 });
 
-// Start the server
-const PORT = 4000; // Use any available port
-server.listen(PORT, () => {
-  console.log(`WebSocket server running on port ${PORT}`);
-});
+// Periodically check for inactive clients
+setInterval(() => {
+  wss.clients.forEach((ws) => {
+    if (!(ws as any).isAlive) {
+      console.log("❌ Removing inactive client");
+      return ws.terminate();
+    }
+    (ws as any).isAlive = false;
+    ws.ping();
+  });
+}, 30000); // Check every 30 seconds
 
-// Export the IO instance for use in the worker
-module.exports = { io, userConnections };
+export { wss, userConnections };
