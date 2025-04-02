@@ -1,6 +1,7 @@
 import { SQSClient, ReceiveMessageCommand, DeleteMessageCommand, SendMessageCommand } from "@aws-sdk/client-sqs";
 import appConfig from "./lib/queue";
 import { handleBulkOrderForApi } from "./actions/orders";
+const { io, userConnections } = require("./websocket-server");
 
 const sqsClient = new SQSClient({
   region: appConfig.awsConfig.region,
@@ -39,8 +40,25 @@ async function processMessage(message : any) {
       console.log("Order processed successfully:", response.data?.orderResponses);
       console.log('Line 40')
       if (response.data?.orderResponses && response.data?.orderResponses.length === 1) {
-        console.log('Line 41')
-        sendToResponseQueue(response.data?.orderResponses[0]);
+        // console.log('Line 41')
+        // sendToResponseQueue(response.data?.orderResponses[0]);
+        const userId = response.data?.orderResponses[0].userId;
+        const update = {
+          orderId: response.data?.orderResponses[0].orderId,
+          status: response.data?.orderResponses[0].status,
+          awbNumber: response.data?.orderResponses[0].awbNumber ? response.data?.orderResponses[0].awbNumber : '',
+        };
+
+        // Emit the update to the WebSocket server
+        if (userId) {
+          // Emit the update to the WebSocket server
+          const socketId = userConnections[userId];
+          if (socketId) {
+            io.to(socketId).emit("orderUpdate", update);
+          } else {
+            console.log(`No active connection found for user ${userId}`);
+          }
+        }
       }
 
     } catch (error) {
