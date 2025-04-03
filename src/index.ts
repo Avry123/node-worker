@@ -14,19 +14,19 @@ const sqsClient = new SQSClient({
   },
 });
 
-async function sendToResponseQueue(orderResult: any) {
-  const responseparams = {
-    QueueUrl: appConfig.responseQueueUrl, // URL of the response queue
-    MessageBody: JSON.stringify(orderResult),
-  };
+// async function sendToResponseQueue(orderResult: any) {
+//   const responseparams = {
+//     QueueUrl: appConfig.responseQueueUrl, // URL of the response queue
+//     MessageBody: JSON.stringify(orderResult),
+//   };
 
-  try {
-    let a = await sqsClient.send(new SendMessageCommand(responseparams));
-    console.log("Line 21 ", a);
-  } catch (error) {
-    console.error("Error sending order result to response queue:", error);
-  }
-}
+//   try {
+//     let a = await sqsClient.send(new SendMessageCommand(responseparams));
+//     console.log("Line 21 ", a);
+//   } catch (error) {
+//     console.error("Error sending order result to response queue:", error);
+//   }
+// }
 
 async function processMessage(message : any) {
   try {
