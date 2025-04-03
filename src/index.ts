@@ -1,7 +1,7 @@
 import { SQSClient, ReceiveMessageCommand, DeleteMessageCommand, SendMessageCommand } from "@aws-sdk/client-sqs";
 import appConfig from "./lib/queue";
 import { handleBulkOrderForApi } from "./actions/orders";
-import { userConnections } from "./websocket-server";
+import { io, userConnections } from "./websocket-server";
 // const { io, userConnections } = require("./websocket-server");
 
 
@@ -41,26 +41,16 @@ async function processMessage(message : any) {
     try {
       const response = await handleBulkOrderForApi(completOrderPass, messageId);
       console.log("Order processed successfully:", response.data?.orderResponses);
-      console.log('Line 40')
-      if (response.data?.orderResponses && response.data?.orderResponses.length === 1) {
-        response.data.orderResponses.forEach((order) => {
-          const userId = order.userId;
-          const update = {
-            orderId: order.orderId,
-            status: order.status,
-            awbNumber: order.awbNumber || '',
-          };
-          if (userId) {
-                  // Send update via WebSocket if user is connected
-            if (userConnections[userId]) {
-                userConnections[userId].send(JSON.stringify(update));
-                console.log(`Update sent to user ${userId}`);
-            }
-          }
-          
-        });
-
-      }
+      // Emit response via WebSocket
+      response.data?.orderResponses && response.data?.orderResponses.forEach((order: any) => {
+        const userSocketId = userConnections.get(order.userId);
+        if (userSocketId) {
+          console.log('Line 48 ', userSocketId);
+          io.to(userSocketId).emit("order_status", order);
+          console.log(`Emitted order status to user ${order.userId}:`, order);
+        }
+      });
+      
 
     } catch (error) {
       console.error("Error processing order:", error);

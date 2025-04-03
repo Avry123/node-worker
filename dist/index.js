@@ -52,24 +52,14 @@ function processMessage(message) {
             try {
                 const response = yield (0, orders_1.handleBulkOrderForApi)(completOrderPass, messageId);
                 console.log("Order processed successfully:", (_a = response.data) === null || _a === void 0 ? void 0 : _a.orderResponses);
-                console.log('Line 40');
-                if (((_b = response.data) === null || _b === void 0 ? void 0 : _b.orderResponses) && ((_c = response.data) === null || _c === void 0 ? void 0 : _c.orderResponses.length) === 1) {
-                    response.data.orderResponses.forEach((order) => {
-                        const userId = order.userId;
-                        const update = {
-                            orderId: order.orderId,
-                            status: order.status,
-                            awbNumber: order.awbNumber || '',
-                        };
-                        if (userId) {
-                            // Send update via WebSocket if user is connected
-                            if (websocket_server_1.userConnections[userId]) {
-                                websocket_server_1.userConnections[userId].send(JSON.stringify(update));
-                                console.log(`Update sent to user ${userId}`);
-                            }
-                        }
-                    });
-                }
+                // Emit response via WebSocket
+                ((_b = response.data) === null || _b === void 0 ? void 0 : _b.orderResponses) && ((_c = response.data) === null || _c === void 0 ? void 0 : _c.orderResponses.forEach((order) => {
+                    const userSocketId = websocket_server_1.userConnections.get(order.userId);
+                    if (userSocketId) {
+                        websocket_server_1.io.to(userSocketId).emit("order_status", order);
+                        console.log(`Emitted order status to user ${order.userId}:`, order);
+                    }
+                }));
             }
             catch (error) {
                 console.error("Error processing order:", error);

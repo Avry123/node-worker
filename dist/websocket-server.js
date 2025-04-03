@@ -1,54 +1,33 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.userConnections = exports.wss = void 0;
-const ws_1 = require("ws");
-const wss = new ws_1.WebSocketServer({ port: 4000 }); // WebSocket server running on port 8080
-exports.wss = wss;
-const userConnections = {}; // Store connected clients
+exports.userConnections = exports.io = void 0;
+const socket_io_1 = require("socket.io");
+const http_1 = require("http");
+const httpServer = (0, http_1.createServer)();
+const io = new socket_io_1.Server(httpServer, {
+    cors: {
+        origin: "*",
+    },
+});
+exports.io = io;
+const userConnections = new Map(); // Ensure it's a Map
 exports.userConnections = userConnections;
-console.log("🚀 WebSocket server started on ws://localhost:8080");
-wss.on("connection", (ws) => {
-    console.log("✅ New WebSocket client connected");
-    ws.on("message", (message) => {
-        try {
-            const data = JSON.parse(message);
-            if (data.type === "register" && data.userId) {
-                userConnections[data.userId] = ws; // Associate user ID with the WebSocket connection
-                console.log(`👤 User ${data.userId} registered for updates`);
-                ws.send(JSON.stringify({ message: "Registration successful" }));
-            }
-        }
-        catch (error) {
-            console.error("❌ Invalid WebSocket message format", error);
-            ws.send(JSON.stringify({ error: "Invalid message format" }));
-        }
+io.on("connection", (socket) => {
+    console.log(`New client connected: ${socket.id}`);
+    socket.on("register", (userId) => {
+        userConnections.set(userId, socket.id);
+        console.log(`User ${userId} registered with socket ID ${socket.id}`);
     });
-    ws.on("close", () => {
-        console.log("❌ WebSocket client disconnected");
-        // Remove disconnected clients
-        Object.keys(userConnections).forEach((userId) => {
-            if (userConnections[userId] === ws) {
-                delete userConnections[userId];
-                console.log(`👤 User ${userId} removed from active connections`);
+    socket.on("disconnect", () => {
+        userConnections.forEach((value, key) => {
+            if (value === socket.id) {
+                userConnections.delete(key);
             }
         });
-    });
-    ws.on("error", (err) => {
-        console.error("⚠️ WebSocket error:", err);
-    });
-    // Heartbeat mechanism to detect inactive clients
-    ws.on("pong", () => {
-        ws.isAlive = true;
+        console.log(`Client disconnected: ${socket.id}`);
     });
 });
-// Periodically check for inactive clients
-setInterval(() => {
-    wss.clients.forEach((ws) => {
-        if (!ws.isAlive) {
-            console.log("❌ Removing inactive client");
-            return ws.terminate();
-        }
-        ws.isAlive = false;
-        ws.ping();
-    });
-}, 30000); // Check every 30 seconds
+// Start the WebSocket server
+httpServer.listen(3000, () => {
+    console.log("WebSocket server listening on port 3000");
+});

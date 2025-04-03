@@ -36,9 +36,11 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
     }
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-// worker.js
 var client_sqs_1 = require("@aws-sdk/client-sqs");
 var queue_1 = require("./lib/queue");
+var orders_1 = require("./actions/orders");
+var websocket_server_1 = require("./websocket-server");
+// const { io, userConnections } = require("./websocket-server");
 var sqsClient = new client_sqs_1.SQSClient({
     region: queue_1.default.awsConfig.region,
     credentials: {
@@ -46,88 +48,146 @@ var sqsClient = new client_sqs_1.SQSClient({
         secretAccessKey: queue_1.default.awsConfig.secretAccessKey,
     },
 });
-function receiveMessages() {
+function sendToResponseQueue(orderResult) {
     return __awaiter(this, void 0, void 0, function () {
-        var params, data, _i, _a, message, error_1, error_2;
-        return __generator(this, function (_b) {
-            switch (_b.label) {
+        var responseparams, a, error_1;
+        return __generator(this, function (_a) {
+            switch (_a.label) {
                 case 0:
-                    params = {
-                        QueueUrl: queue_1.default.primaryQueueUrl, // Use the primary queue URL
-                        MaxNumberOfMessages: 10, // Maximum number of messages to retrieve in one call
-                        WaitTimeSeconds: 20, // Long polling - wait up to 20 seconds for messages to arrive
+                    responseparams = {
+                        QueueUrl: queue_1.default.responseQueueUrl, // URL of the response queue
+                        MessageBody: JSON.stringify(orderResult),
                     };
-                    _b.label = 1;
+                    _a.label = 1;
                 case 1:
-                    _b.trys.push([1, 9, , 10]);
-                    return [4 /*yield*/, sqsClient.send(new client_sqs_1.ReceiveMessageCommand(params))];
+                    _a.trys.push([1, 3, , 4]);
+                    return [4 /*yield*/, sqsClient.send(new client_sqs_1.SendMessageCommand(responseparams))];
                 case 2:
-                    data = _b.sent();
-                    if (!data.Messages || data.Messages.length === 0) {
-                        console.log("No messages received.");
-                        return [2 /*return*/];
-                    }
-                    _i = 0, _a = data.Messages;
-                    _b.label = 3;
+                    a = _a.sent();
+                    console.log("Line 21 ", a);
+                    return [3 /*break*/, 4];
                 case 3:
-                    if (!(_i < _a.length)) return [3 /*break*/, 8];
-                    message = _a[_i];
-                    _b.label = 4;
-                case 4:
-                    _b.trys.push([4, 6, , 7]);
-                    console.log("Processing message:", message.Body);
-                    console.log('Line 40 ', message);
-                    // After successful processing, delete the message from the queue
-                    return [4 /*yield*/, sqsClient.send(new client_sqs_1.DeleteMessageCommand({
-                            QueueUrl: queue_1.default.primaryQueueUrl,
-                            ReceiptHandle: message.ReceiptHandle,
-                        }))];
-                case 5:
-                    // After successful processing, delete the message from the queue
-                    _b.sent();
-                    return [3 /*break*/, 7];
-                case 6:
-                    error_1 = _b.sent();
-                    console.error("Error processing message:", error_1);
-                    return [3 /*break*/, 7];
-                case 7:
-                    _i++;
-                    return [3 /*break*/, 3];
-                case 8: return [3 /*break*/, 10];
-                case 9:
-                    error_2 = _b.sent();
-                    console.error("Error receiving messages from SQS:", error_2);
-                    return [3 /*break*/, 10];
-                case 10: return [2 /*return*/];
+                    error_1 = _a.sent();
+                    console.error("Error sending order result to response queue:", error_1);
+                    return [3 /*break*/, 4];
+                case 4: return [2 /*return*/];
             }
         });
     });
 }
-// Continuously poll the SQS queue for new messages
+function processMessage(message) {
+    return __awaiter(this, void 0, void 0, function () {
+        var _a, messageId, completOrderPass, response, error_2, error_3;
+        var _b, _c, _d;
+        return __generator(this, function (_e) {
+            switch (_e.label) {
+                case 0:
+                    _e.trys.push([0, 6, , 7]);
+                    if (!message.Body) {
+                        console.error("Message body is empty or undefined.");
+                        return [2 /*return*/];
+                    }
+                    _a = JSON.parse(message.Body), messageId = _a.messageId, completOrderPass = _a.completOrderPass;
+                    _e.label = 1;
+                case 1:
+                    _e.trys.push([1, 3, , 4]);
+                    return [4 /*yield*/, (0, orders_1.handleBulkOrderForApi)(completOrderPass, messageId)];
+                case 2:
+                    response = _e.sent();
+                    console.log("Order processed successfully:", (_b = response.data) === null || _b === void 0 ? void 0 : _b.orderResponses);
+                    // Emit response via WebSocket
+                    ((_c = response.data) === null || _c === void 0 ? void 0 : _c.orderResponses) && ((_d = response.data) === null || _d === void 0 ? void 0 : _d.orderResponses.forEach(function (order) {
+                        var userSocketId = websocket_server_1.userConnections.get(order.userId);
+                        if (userSocketId) {
+                            websocket_server_1.io.to(userSocketId).emit("order_status", order);
+                            console.log("Emitted order status to user ".concat(order.userId, ":"), order);
+                        }
+                    }));
+                    return [3 /*break*/, 4];
+                case 3:
+                    error_2 = _e.sent();
+                    console.error("Error processing order:", error_2);
+                    return [2 /*return*/]; // Do not delete message if processing fails
+                case 4: 
+                // Delete message after successful processing
+                return [4 /*yield*/, sqsClient.send(new client_sqs_1.DeleteMessageCommand({
+                        QueueUrl: queue_1.default.primaryQueueUrl,
+                        ReceiptHandle: message.ReceiptHandle,
+                    }))];
+                case 5:
+                    // Delete message after successful processing
+                    _e.sent();
+                    console.log("Message ".concat(messageId, " deleted from queue."));
+                    return [3 /*break*/, 7];
+                case 6:
+                    error_3 = _e.sent();
+                    console.error("Error processing message:", error_3);
+                    return [3 /*break*/, 7];
+                case 7: return [2 /*return*/];
+            }
+        });
+    });
+}
+function receiveMessages() {
+    return __awaiter(this, void 0, void 0, function () {
+        var params, data, a, error_4;
+        return __generator(this, function (_a) {
+            switch (_a.label) {
+                case 0:
+                    params = {
+                        QueueUrl: queue_1.default.primaryQueueUrl,
+                        MaxNumberOfMessages: 10,
+                        WaitTimeSeconds: 20, // Long polling
+                    };
+                    _a.label = 1;
+                case 1:
+                    _a.trys.push([1, 4, , 5]);
+                    return [4 /*yield*/, sqsClient.send(new client_sqs_1.ReceiveMessageCommand(params))];
+                case 2:
+                    data = _a.sent();
+                    if (!data.Messages || data.Messages.length === 0) {
+                        console.log("No messages received.");
+                        return [2 /*return*/];
+                    }
+                    return [4 /*yield*/, Promise.allSettled(data.Messages.map(processMessage))];
+                case 3:
+                    a = _a.sent();
+                    console.log('Line 61 ', a);
+                    return [3 /*break*/, 5];
+                case 4:
+                    error_4 = _a.sent();
+                    console.error("Error receiving messages from SQS:", error_4);
+                    return [3 /*break*/, 5];
+                case 5: return [2 /*return*/];
+            }
+        });
+    });
+}
 function startWorker() {
     return __awaiter(this, void 0, void 0, function () {
         return __generator(this, function (_a) {
             switch (_a.label) {
                 case 0:
                     console.log("SQS Worker started. Listening for messages...");
+                    process.on("SIGINT", function () {
+                        console.log("Shutting down worker...");
+                        process.exit(0);
+                    });
                     _a.label = 1;
                 case 1:
                     if (!true) return [3 /*break*/, 4];
                     return [4 /*yield*/, receiveMessages()];
                 case 2:
                     _a.sent();
-                    // Add a delay between polls (e.g., 5 seconds)
                     return [4 /*yield*/, new Promise(function (resolve) { return setTimeout(resolve, 5000); })];
                 case 3:
-                    // Add a delay between polls (e.g., 5 seconds)
-                    _a.sent();
+                    _a.sent(); // Add delay to avoid excessive API calls
                     return [3 /*break*/, 1];
                 case 4: return [2 /*return*/];
             }
         });
     });
 }
-// Start the worker
 startWorker().catch(function (error) {
     console.error("Worker encountered an error:", error);
 });
