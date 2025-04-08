@@ -1,11 +1,20 @@
 import { Server } from "socket.io";
 import { createServer } from "http";
+import express from "express";
 
-const httpServer = createServer();
+
+const app = express();
+
+const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
     origin: "*",
   },
+});
+
+// Add a health check endpoint
+app.get("/health", (req, res) => {
+  res.status(200).send("WebSocket server is healthy ✅");
 });
 
 const userConnections = new Map<string, string>(); // Ensure it's a Map

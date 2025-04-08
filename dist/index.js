@@ -24,21 +24,18 @@ const sqsClient = new client_sqs_1.SQSClient({
         secretAccessKey: queue_1.default.awsConfig.secretAccessKey,
     },
 });
-function sendToResponseQueue(orderResult) {
-    return __awaiter(this, void 0, void 0, function* () {
-        const responseparams = {
-            QueueUrl: queue_1.default.responseQueueUrl, // URL of the response queue
-            MessageBody: JSON.stringify(orderResult),
-        };
-        try {
-            let a = yield sqsClient.send(new client_sqs_1.SendMessageCommand(responseparams));
-            console.log("Line 21 ", a);
-        }
-        catch (error) {
-            console.error("Error sending order result to response queue:", error);
-        }
-    });
-}
+// async function sendToResponseQueue(orderResult: any) {
+//   const responseparams = {
+//     QueueUrl: appConfig.responseQueueUrl, // URL of the response queue
+//     MessageBody: JSON.stringify(orderResult),
+//   };
+//   try {
+//     let a = await sqsClient.send(new SendMessageCommand(responseparams));
+//     console.log("Line 21 ", a);
+//   } catch (error) {
+//     console.error("Error sending order result to response queue:", error);
+//   }
+// }
 function processMessage(message) {
     return __awaiter(this, void 0, void 0, function* () {
         var _a, _b, _c;
@@ -56,6 +53,7 @@ function processMessage(message) {
                 ((_b = response.data) === null || _b === void 0 ? void 0 : _b.orderResponses) && ((_c = response.data) === null || _c === void 0 ? void 0 : _c.orderResponses.forEach((order) => {
                     const userSocketId = websocket_server_1.userConnections.get(order.userId);
                     if (userSocketId) {
+                        console.log('Line 48 ', userSocketId);
                         websocket_server_1.io.to(userSocketId).emit("order_status", order);
                         console.log(`Emitted order status to user ${order.userId}:`, order);
                     }
