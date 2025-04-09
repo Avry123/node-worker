@@ -8,6 +8,17 @@ const socket_io_1 = require("socket.io");
 const http_1 = require("http");
 const express_1 = __importDefault(require("express"));
 const app = (0, express_1.default)();
+app.use(express_1.default.json());
+// Add more extensive logging
+app.use((req, res, next) => {
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+    next();
+});
+// Add a health check endpoint
+app.get("/health", (req, res) => {
+    console.log("➡️ Received /health request");
+    res.status(200).send("WebSocket server is healthy ✅");
+});
 const httpServer = (0, http_1.createServer)(app);
 const io = new socket_io_1.Server(httpServer, {
     cors: {
@@ -15,10 +26,6 @@ const io = new socket_io_1.Server(httpServer, {
     },
 });
 exports.io = io;
-// Add a health check endpoint
-app.get("/health", (req, res) => {
-    res.status(200).send("WebSocket server is healthy ✅");
-});
 const userConnections = new Map(); // Ensure it's a Map
 exports.userConnections = userConnections;
 io.on("connection", (socket) => {

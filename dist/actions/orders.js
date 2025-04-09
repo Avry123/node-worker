@@ -256,6 +256,7 @@ function bulkOrders_with_3pl_preference_for_api(data, messageId) {
                                         isReverse: rateData.isReverse,
                                     },
                                     selectedPartner: selectedPartner,
+                                    Flag: "API"
                                 }),
                             });
                             const ratesApi = yield response.json();

@@ -5,16 +5,26 @@ import express from "express";
 
 const app = express();
 
+app.use(express.json());
+
+// Add more extensive logging
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  next();
+});
+
+
+// Add a health check endpoint
+app.get("/health", (req, res) => {
+  console.log("➡️ Received /health request");
+  res.status(200).send("WebSocket server is healthy ✅");
+});
+
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
     origin: "*",
   },
-});
-
-// Add a health check endpoint
-app.get("/health", (req, res) => {
-  res.status(200).send("WebSocket server is healthy ✅");
 });
 
 const userConnections = new Map<string, string>(); // Ensure it's a Map

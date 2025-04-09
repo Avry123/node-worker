@@ -17,6 +17,20 @@ const queue_1 = __importDefault(require("./lib/queue"));
 const orders_1 = require("./actions/orders");
 const websocket_server_1 = require("./websocket-server");
 // const { io, userConnections } = require("./websocket-server");
+const http_1 = __importDefault(require("http"));
+const HEALTH_PORT = 5001;
+http_1.default.createServer((req, res) => {
+    if (req.url === "/health") {
+        res.writeHead(200, { "Content-Type": "text/plain" });
+        res.end("Node worker is healthy ✅");
+    }
+    else {
+        res.writeHead(404);
+        res.end();
+    }
+}).listen(HEALTH_PORT, () => {
+    console.log(`Health check server running on port ${HEALTH_PORT}`);
+});
 const sqsClient = new client_sqs_1.SQSClient({
     region: queue_1.default.awsConfig.region,
     credentials: {

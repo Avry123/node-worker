@@ -296,6 +296,7 @@ export async function handleBulkOrderForApi(data: CompleteOrderTypeApi,messageId
                       isReverse: rateData.isReverse,
                     },
                     selectedPartner: selectedPartner,
+                    Flag: "API"
                   }),
                 },
               );

@@ -3,8 +3,22 @@ import appConfig from "./lib/queue";
 import { handleBulkOrderForApi } from "./actions/orders";
 import { io, userConnections } from "./websocket-server";
 // const { io, userConnections } = require("./websocket-server");
+import http from "http";
 
 
+const HEALTH_PORT = 5001;
+
+http.createServer((req, res) => {
+  if (req.url === "/health") {
+    res.writeHead(200, { "Content-Type": "text/plain" });
+    res.end("Node worker is healthy ✅");
+  } else {
+    res.writeHead(404);
+    res.end();
+  }
+}).listen(HEALTH_PORT, () => {
+  console.log(`Health check server running on port ${HEALTH_PORT}`);
+});
 
 const sqsClient = new SQSClient({
   region: appConfig.awsConfig.region,
