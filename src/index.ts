@@ -6,7 +6,7 @@ import { io, userConnections } from "./websocket-server";
 import http from "http";
 
 
-const HEALTH_PORT = 5001;
+const HEALTH_PORT = 3111;
 
 http.createServer((req, res) => {
   if (req.url === "/health") {

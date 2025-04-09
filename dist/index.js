@@ -18,7 +18,7 @@ const orders_1 = require("./actions/orders");
 const websocket_server_1 = require("./websocket-server");
 // const { io, userConnections } = require("./websocket-server");
 const http_1 = __importDefault(require("http"));
-const HEALTH_PORT = 5001;
+const HEALTH_PORT = 3111;
 http_1.default.createServer((req, res) => {
     if (req.url === "/health") {
         res.writeHead(200, { "Content-Type": "text/plain" });
